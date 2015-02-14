@@ -1,0 +1,14 @@
+[package]
+
+name = "rdm"
+description = "A command-line redmine client"
+version = "0.0.1"
+authors = ["Renato Zannon <renato@rrsz.com.br>"]
+
+[dependencies]
+hyper = "*"
+docopt = "*"
+docopt_macros = "*"
+json_macros = "*"
+rustc-serialize = "*"
+url = "*"

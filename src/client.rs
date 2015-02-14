@@ -1,0 +1,92 @@
+/* rdm - A command-line redmine client
+ * Copyright (C) 2015 Renato Zannon
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, see <http://www.gnu.org/licenses/>. */
+
+use std::fmt;
+use hyper::header::{self, Header, HeaderFormat};
+use url::Url;
+use hyper;
+use hyper::net::HttpConnector;
+
+use user_config::Config;
+
+#[derive(Clone)]
+struct RedmineApiKey { key: String }
+
+impl Header for RedmineApiKey {
+    fn header_name() -> &'static str {
+        "X-Redmine-API-Key"
+    }
+
+    fn parse_header(raw: &[Vec<u8>]) -> Option<RedmineApiKey> {
+        use hyper::header::parsing::from_one_raw_str;
+
+        from_one_raw_str(raw).map(|k| RedmineApiKey { key: k })
+    }
+}
+
+impl HeaderFormat for RedmineApiKey {
+    fn fmt_header(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.key)
+    }
+}
+
+pub struct Client {
+    config: Config,
+}
+
+impl Client {
+    pub fn new(config: Config) -> Client {
+        Client { config: config }
+    }
+
+    pub fn update_issue(&self, number: u32, status: i32) -> Result<(), hyper::HttpError> {
+        let request_body = json!({
+            "issue": { "status_id": (status) }
+        }).to_string();
+
+        let mut client = hyper::Client::new();
+        let response = self.put_request(number, &mut client)
+            .body(&request_body[..])
+            .send();
+
+        match response {
+            Ok(_)  => Ok(()),
+            Err(e) => Err(e),
+        }
+    }
+
+    fn put_request<'a>(&self, number: u32, client: &'a mut hyper::Client<HttpConnector<'a>>)
+            -> hyper::client::RequestBuilder<'a, Url, HttpConnector<'a>> {
+        let request_url = self.issue_url(number);
+
+        client
+            .put(request_url)
+            .header(RedmineApiKey { key: self.config.redmine_key.clone() })
+            .header(header::ContentType("application/json".parse().unwrap()))
+    }
+
+    fn issue_url(&self, number: u32) -> Url {
+        let mut request_url = self.config.redmine_url.clone();
+
+        {
+            let path = request_url.path_mut().unwrap();
+            path.push("issues".to_string());
+            path.push(format!("{}.json", number));
+        }
+
+        request_url
+    }
+}
