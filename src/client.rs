@@ -15,10 +15,11 @@
  * along with this program; if not, see <http://www.gnu.org/licenses/>. */
 
 use std::fmt;
-use hyper::header::{self, Header, HeaderFormat};
 use url::Url;
+
 use hyper;
-use hyper::net::HttpConnector;
+use hyper::header::{self, Header, HeaderFormat};
+use hyper::HttpResult;
 
 use user_config::Config;
 
@@ -47,20 +48,30 @@ pub struct Client {
     config: Config,
 }
 
+struct Request<'a> {
+    method: Method,
+    body: String,
+    url: Url,
+}
+
+enum Method {
+    Get,
+    Post,
+    Put,
+    Delete,
+}
+
 impl Client {
     pub fn new(config: Config) -> Client {
         Client { config: config }
     }
 
     pub fn update_issue(&self, number: u32, status: i32) -> Result<(), hyper::HttpError> {
-        let request_body = json!({
-            "issue": { "status_id": (status) }
-        }).to_string();
-
-        let mut client = hyper::Client::new();
-        let response = self.put_request(number, &mut client)
-            .body(&request_body[..])
-            .send();
+        let response = self.send_request(Request {
+            method: Method::Put,
+            body: json!({ "issue": { "status_id": (status) } }).to_string(),
+            url: self.issue_url(number),
+        });
 
         match response {
             Ok(_)  => Ok(()),
@@ -68,14 +79,21 @@ impl Client {
         }
     }
 
-    fn put_request<'a>(&self, number: u32, client: &'a mut hyper::Client<HttpConnector<'a>>)
-            -> hyper::client::RequestBuilder<'a, Url, HttpConnector<'a>> {
-        let request_url = self.issue_url(number);
+    fn send_request<'a>(&self, request: Request) -> HttpResult<hyper::client::Response> {
+        let mut client = hyper::Client::new();
 
-        client
-            .put(request_url)
+        let request_builder = match request.method {
+            Method::Get    => client.get(request.url),
+            Method::Post   => client.post(request.url),
+            Method::Put    => client.put(request.url),
+            Method::Delete => client.delete(request.url),
+        };
+
+        request_builder
             .header(RedmineApiKey { key: self.config.redmine_key.clone() })
             .header(header::ContentType("application/json".parse().unwrap()))
+            .body(&request.body[..])
+            .send()
     }
 
     fn issue_url(&self, number: u32) -> Url {
