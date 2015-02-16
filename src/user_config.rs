@@ -21,10 +21,11 @@ use std::{env, fmt};
 use rustc_serialize::json;
 use url::Url;
 
-#[derive(RustcDecodable, Debug)]
+#[derive(RustcDecodable, Debug, Clone)]
 pub struct Config {
     pub redmine_key: String,
     pub redmine_url: Url,
+    pub default_close_status: Option<String>,
 }
 
 pub enum ConfigError {

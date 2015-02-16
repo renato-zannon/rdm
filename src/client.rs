@@ -21,6 +21,8 @@ use hyper;
 use hyper::header::{self, Header, HeaderFormat};
 use hyper::HttpResult;
 
+use rustc_serialize::json;
+
 use user_config::Config;
 
 #[derive(Clone)]
@@ -50,7 +52,7 @@ pub struct Client {
 
 struct Request<'a> {
     method: Method,
-    body: String,
+    body: Option<String>,
     url: Url,
 }
 
@@ -66,10 +68,10 @@ impl Client {
         Client { config: config }
     }
 
-    pub fn update_issue(&self, number: u32, status: i32) -> Result<(), hyper::HttpError> {
+    pub fn update_issue(&self, number: u32, status: u32) -> Result<(), hyper::HttpError> {
         let response = self.send_request(Request {
             method: Method::Put,
-            body: json!({ "issue": { "status_id": (status) } }).to_string(),
+            body: Some(json!({ "issue": { "status_id": (status) } }).to_string()),
             url: self.issue_url(number),
         });
 
@@ -77,6 +79,30 @@ impl Client {
             Ok(_)  => Ok(()),
             Err(e) => Err(e),
         }
+    }
+
+    pub fn issue_statuses(&self) -> Result<Vec<(u32, String)>, hyper::HttpError> {
+        #[derive(RustcDecodable, Debug)]
+        struct IssueStatuses {
+            issue_statuses: Vec<IssueStatus>
+        }
+
+        #[derive(RustcDecodable, Debug)]
+        struct IssueStatus {
+            id: u32,
+            name: String,
+        }
+
+        let maybe_response = self.send_request(Request {
+            method: Method::Get,
+            body: None,
+            url: self.build_url(vec!["issue_statuses.json".to_string()]),
+        });
+
+        let response = maybe_response.unwrap().read_to_string().unwrap();
+        let parsed: IssueStatuses = json::decode(&response).unwrap();
+
+        Ok(parsed.issue_statuses.into_iter().map(|status| (status.id, status.name)).collect())
     }
 
     fn send_request<'a>(&self, request: Request) -> HttpResult<hyper::client::Response> {
@@ -89,20 +115,28 @@ impl Client {
             Method::Delete => client.delete(request.url),
         };
 
-        request_builder
+        let request_with_headers = request_builder
             .header(RedmineApiKey { key: self.config.redmine_key.clone() })
-            .header(header::ContentType("application/json".parse().unwrap()))
-            .body(&request.body[..])
-            .send()
+            .header(header::ContentType("application/json".parse().unwrap()));
+
+        let complete_request = match request.body {
+            None        => request_with_headers,
+            Some(ref s) => request_with_headers.body(&s[..]),
+        };
+
+        complete_request.send()
     }
 
     fn issue_url(&self, number: u32) -> Url {
+        self.build_url(vec!["issues".to_string(), format!("{}.json", number)])
+    }
+
+    fn build_url(&self, components: Vec<String>) -> Url {
         let mut request_url = self.config.redmine_url.clone();
 
         {
             let path = request_url.path_mut().unwrap();
-            path.push("issues".to_string());
-            path.push(format!("{}.json", number));
+            path.extend(components.into_iter());
         }
 
         request_url

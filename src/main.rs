@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, see <http://www.gnu.org/licenses/>. */
 
-#![feature(plugin, core, io, path, env)]
+#![feature(plugin, core, io, path, env, collections, unicode)]
 #![plugin(json_macros, docopt_macros)]
 
 extern crate "rustc-serialize" as rustc_serialize;
@@ -29,8 +29,6 @@ mod client;
 mod user_config;
 
 use args::{Args, parse};
-
-const SOLVED_STATUS_ID: i32 = 3;
 
 macro_rules! get_or_exit(
     ($result:expr, $err_p:pat => $err_e:expr) => {
@@ -50,13 +48,34 @@ fn main() {
     let args   = get_or_exit!(args::parse(),      e => e.exit_status());
     let config = get_or_exit!(user_config::get(), _ => 1);
 
-    let client = client::Client::new(config);
+    let mut client = client::Client::new(config.clone());
 
     match args {
-        Args::CloseIssue { number, .. } => {
-            client.update_issue(number, SOLVED_STATUS_ID).unwrap();
+        Args::CloseIssue { number, close_status } => {
+            let status_id = close_status
+                .or_else(move || config.default_close_status)
+                .and_then(|name| find_status_id(&mut client, &name))
+                .expect("Unable to find the status id to close the issue");
+
+            client.update_issue(number, status_id).unwrap();
         },
 
         _ => unimplemented!(),
     }
+}
+
+fn find_status_id(client: &mut client::Client, status_name: &str) -> Option<u32> {
+    let statuses = client.issue_statuses().unwrap();
+
+    statuses.into_iter().filter_map(|(id, name)| {
+        let matches = status_name.nfkc_chars().zip(name.nfkc_chars()).all(|(query_chr, name_chr)| {
+            query_chr.to_lowercase() == name_chr.to_lowercase()
+        });
+
+        if matches {
+            Some(id)
+        } else {
+            None
+        }
+    }).next()
 }
