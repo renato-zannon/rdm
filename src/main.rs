@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, see <http://www.gnu.org/licenses/>. */
 
-#![feature(plugin, core, io, path, env, collections, unicode)]
+#![feature(plugin, core, io, path, env, collections, unicode, fs, old_io)]
 #![plugin(json_macros, docopt_macros)]
 
 extern crate "rustc-serialize" as rustc_serialize;

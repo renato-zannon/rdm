@@ -14,7 +14,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, see <http://www.gnu.org/licenses/>. */
 
-use std::old_io::{File, IoError};
+use std::io::prelude::*;
+use std::io::{self, BufReader};
+use std::fs::File;
+use std::path::PathBuf;
+
 use std::error::{Error, FromError};
 use std::{env, fmt};
 
@@ -29,9 +33,9 @@ pub struct Config {
 }
 
 pub enum ConfigError {
-    Loading(IoError),
+    Loading(io::Error),
     Parsing(json::DecoderError),
-    NoConfigFile { searched_paths: Vec<Path> },
+    NoConfigFile { searched_paths: Vec<PathBuf> },
 }
 
 impl fmt::Display for ConfigError {
@@ -64,8 +68,8 @@ impl Error for ConfigError {
     }
 }
 
-impl FromError<IoError> for ConfigError {
-    fn from_error(err: IoError) -> ConfigError {
+impl FromError<io::Error> for ConfigError {
+    fn from_error(err: io::Error) -> ConfigError {
         ConfigError::Loading(err)
     }
 }
@@ -77,10 +81,29 @@ impl FromError<json::DecoderError> for ConfigError {
 }
 
 pub fn get() -> Result<Config, ConfigError> {
-    use std::old_io::fs::PathExtensions;
+    let path = match first_user_config() {
+        Ok(path) => path,
+        Err(tried_paths) => {
+            return Err(ConfigError::NoConfigFile { searched_paths: tried_paths });
+        }
+    };
+
+    let config_file = try!(File::open(&path));
+
+    let mut config_src = String::new();
+    try!(BufReader::new(config_file).read_to_string(&mut config_src));
+
+    json::decode(&config_src).map_err(FromError::from_error)
+}
+
+fn first_user_config() -> Result<PathBuf, Vec<PathBuf>> {
     use std::iter::Unfold;
 
-    let possible_paths: Vec<Path> = Unfold::new(env::current_dir().ok(), |current_dir| {
+    let cwd: Option<PathBuf> = env::current_dir().ok().map(|old_path| {
+        PathBuf::new(&old_path)
+    });
+
+    let possible_paths = Unfold::new(cwd, |current_dir| {
         current_dir.clone().map(|dir| {
             let mut next = dir.clone();
 
@@ -92,18 +115,17 @@ pub fn get() -> Result<Config, ConfigError> {
 
             dir
         })
-    }).map(|path| path.join(".rdm.json")).collect();
+    }).map(|mut path| { path.push(".rdm.json"); path });
 
-    let maybe_path = possible_paths.iter().find(|p| p.exists());
+    let mut tried_paths = Vec::new();
 
-    let path = match maybe_path {
-        Some(path) => path,
-        None       => {
-            return Err(ConfigError::NoConfigFile { searched_paths: possible_paths.clone() });
+    for path in possible_paths {
+        if path.exists() {
+            return Ok(path);
+        } else {
+            tried_paths.push(path);
         }
-    };
+    }
 
-    let config_src = try!(File::open(path).read_to_string());
-
-    json::decode(&config_src).map_err(FromError::from_error)
+    return Err(tried_paths);
 }
