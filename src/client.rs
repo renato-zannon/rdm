@@ -93,6 +93,8 @@ impl FromError<json::DecoderError> for Error {
 }
 
 impl Client {
+    pub fn config(&self) -> &Config { &self.config }
+
     pub fn new(config: Config) -> Client {
         Client { config: config }
     }

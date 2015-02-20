@@ -7,6 +7,7 @@ dependencies = [
  "hyper 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "json_macros 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",
+ "time 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "url 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
