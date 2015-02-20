@@ -1,0 +1,5 @@
+source "https://rubygems.org"
+
+gem "sinatra"
+gem "rack-parser", require: "rack/parser"
+gem "puma"
