@@ -14,6 +14,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, see <http://www.gnu.org/licenses/>. */
 
+use std::fmt;
+use std::error::FromError;
 use url::{Url, UrlParser};
 
 use hyper;
@@ -45,25 +47,49 @@ enum Method {
     Delete,
 }
 
+#[derive(Debug)]
+pub enum Error {
+    Http(hyper::HttpError)
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        match *self {
+            Error::Http(ref err) => write!(f, "Http error: {}", err),
+        }
+    }
+}
+
+impl ::std::error::Error for Error {
+    fn description(&self) -> &str {
+        match *self {
+            Error::Http(_) => "Http error",
+        }
+    }
+}
+
+impl FromError<hyper::HttpError> for Error {
+    fn from_error(err: hyper::HttpError) -> Error {
+        Error::Http(err)
+    }
+}
+
 impl Client {
     pub fn new(config: Config) -> Client {
         Client { config: config }
     }
 
-    pub fn update_issue(&self, number: u32, status: u32) -> Result<(), hyper::HttpError> {
-        let response = self.send_request(Request {
+    pub fn update_issue(&self, number: u32, status: u32) -> Result<(), Error> {
+        let _response = try!(self.send_request(Request {
             method: Method::Put,
             body: Some(json!({ "issue": { "status_id": (status) } }).to_string()),
             url: self.issue_url(number),
-        });
+        }));
 
-        match response {
-            Ok(_)  => Ok(()),
-            Err(e) => Err(e),
-        }
+        Ok(())
     }
 
-    pub fn issue_statuses(&self) -> Result<Vec<(u32, String)>, hyper::HttpError> {
+    pub fn issue_statuses(&self) -> Result<Vec<(u32, String)>, Error> {
         #[derive(RustcDecodable, Debug)]
         struct IssueStatuses {
             issue_statuses: Vec<IssueStatus>
