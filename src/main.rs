@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, see <http://www.gnu.org/licenses/>. */
 
-#![feature(plugin, core, io, path, env, collections, unicode, fs, old_io)]
+#![feature(plugin, core, io, path, env, unicode, fs, old_io)]
 #![plugin(json_macros, docopt_macros)]
 
 extern crate "rustc-serialize" as rustc_serialize;
@@ -60,6 +60,15 @@ fn main() {
             client.update_issue(number, status_id).unwrap();
         },
 
+        Args::UpdateIssue { number, new_status } => {
+            let status_id = match find_status_id(&mut client, &new_status) {
+                Some(id) => id,
+                None     => panic!("Unable to find status id for status '{}'", new_status),
+            };
+
+            client.update_issue(number, status_id).unwrap();
+        },
+
         _ => unimplemented!(),
     }
 }
@@ -68,7 +77,7 @@ fn find_status_id(client: &mut client::Client, status_name: &str) -> Option<u32>
     let statuses = client.issue_statuses().unwrap();
 
     statuses.into_iter().filter_map(|(id, name)| {
-        let matches = status_name.nfkc_chars().zip(name.nfkc_chars()).all(|(query_chr, name_chr)| {
+        let matches = status_name.chars().zip(name.chars()).all(|(query_chr, name_chr)| {
             query_chr.to_lowercase() == name_chr.to_lowercase()
         });
 
