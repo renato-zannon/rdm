@@ -20,6 +20,8 @@
 extern crate "rustc-serialize" as rustc_serialize;
 extern crate docopt;
 extern crate url;
+
+#[macro_use(impl_header, deref)]
 extern crate hyper;
 
 use std::env;

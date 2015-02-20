@@ -14,11 +14,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, see <http://www.gnu.org/licenses/>. */
 
-use std::fmt;
 use url::{Url, UrlParser};
 
 use hyper;
-use hyper::header::{self, Header, HeaderFormat};
+use hyper::header::{self, HeaderFormat};
 use hyper::HttpResult;
 
 use rustc_serialize::json;
@@ -26,25 +25,8 @@ use rustc_serialize::json;
 use user_config::Config;
 
 #[derive(Clone)]
-struct RedmineApiKey { key: String }
-
-impl Header for RedmineApiKey {
-    fn header_name() -> &'static str {
-        "X-Redmine-API-Key"
-    }
-
-    fn parse_header(raw: &[Vec<u8>]) -> Option<RedmineApiKey> {
-        use hyper::header::parsing::from_one_raw_str;
-
-        from_one_raw_str(raw).map(|k| RedmineApiKey { key: k })
-    }
-}
-
-impl HeaderFormat for RedmineApiKey {
-    fn fmt_header(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.key)
-    }
-}
+struct RedmineApiKey(String);
+impl_header!(RedmineApiKey, "X-Redmine-API-Key", String);
 
 pub struct Client {
     config: Config,
@@ -116,7 +98,7 @@ impl Client {
         };
 
         let request_with_headers = request_builder
-            .header(RedmineApiKey { key: self.config.redmine_key().to_string() })
+            .header(RedmineApiKey(self.config.redmine_key().to_string()))
             .header(header::ContentType("application/json".parse().unwrap()));
 
         let complete_request = match request.body {
