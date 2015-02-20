@@ -17,7 +17,7 @@
 use std::io::prelude::*;
 use std::io::{self, BufReader};
 use std::fs::File;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use std::error::{Error, FromError};
 use std::{env, fmt};
@@ -26,10 +26,25 @@ use rustc_serialize::json;
 use url::Url;
 
 #[derive(RustcDecodable, Debug, Clone)]
+struct ConfigData {
+    redmine_key: String,
+    redmine_url: Url,
+    default_close_status: Option<String>,
+}
+
+#[derive(Debug, Clone)]
 pub struct Config {
-    pub redmine_key: String,
-    pub redmine_url: Url,
-    pub default_close_status: Option<String>,
+    data: ConfigData,
+    path: PathBuf,
+}
+
+impl Config {
+    pub fn path(&self) -> &Path { &self.path }
+    pub fn redmine_key(&self) -> &str { &self.data.redmine_key }
+    pub fn redmine_url(&self) -> &Url { &self.data.redmine_url }
+    pub fn default_close_status(&self) -> Option<&str> {
+        self.data.default_close_status.as_ref().map(|s| &s[..])
+    }
 }
 
 pub enum ConfigError {
@@ -93,7 +108,12 @@ pub fn get() -> Result<Config, ConfigError> {
     let mut config_src = String::new();
     try!(BufReader::new(config_file).read_to_string(&mut config_src));
 
-    json::decode(&config_src).map_err(FromError::from_error)
+    let data = try!(json::decode(&config_src));
+
+    Ok(Config {
+        data: data,
+        path: path,
+    })
 }
 
 fn first_user_config() -> Result<PathBuf, Vec<PathBuf>> {

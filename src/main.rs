@@ -53,7 +53,7 @@ fn main() {
     match args {
         Args::CloseIssue { number, close_status } => {
             let status_id = close_status
-                .or_else(move || config.default_close_status)
+                .or_else(move || config.default_close_status().map(|s| s.to_string()))
                 .and_then(|name| find_status_id(&mut client, &name))
                 .expect("Unable to find the status id to close the issue");
 

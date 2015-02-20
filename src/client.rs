@@ -116,7 +116,7 @@ impl Client {
         };
 
         let request_with_headers = request_builder
-            .header(RedmineApiKey { key: self.config.redmine_key.clone() })
+            .header(RedmineApiKey { key: self.config.redmine_key().to_string() })
             .header(header::ContentType("application/json".parse().unwrap()));
 
         let complete_request = match request.body {
@@ -132,7 +132,7 @@ impl Client {
     }
 
     fn build_url(&self, path: &str) -> Url {
-        let ref request_url = self.config.redmine_url;
+        let request_url = self.config.redmine_url();
 
         UrlParser::new()
             .base_url(request_url)
