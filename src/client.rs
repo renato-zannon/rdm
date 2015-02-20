@@ -15,7 +15,7 @@
  * along with this program; if not, see <http://www.gnu.org/licenses/>. */
 
 use std::fmt;
-use url::Url;
+use url::{Url, UrlParser};
 
 use hyper;
 use hyper::header::{self, Header, HeaderFormat};
@@ -96,7 +96,7 @@ impl Client {
         let maybe_response = self.send_request(Request {
             method: Method::Get,
             body: None,
-            url: self.build_url(vec!["issue_statuses.json".to_string()]),
+            url: self.build_url("issue_statuses.json"),
         });
 
         let response = maybe_response.unwrap().read_to_string().unwrap();
@@ -128,17 +128,15 @@ impl Client {
     }
 
     fn issue_url(&self, number: u32) -> Url {
-        self.build_url(vec!["issues".to_string(), format!("{}.json", number)])
+        self.build_url(&format!("issues/{}.json", number))
     }
 
-    fn build_url(&self, components: Vec<String>) -> Url {
-        let mut request_url = self.config.redmine_url.clone();
+    fn build_url(&self, path: &str) -> Url {
+        let ref request_url = self.config.redmine_url;
 
-        {
-            let path = request_url.path_mut().unwrap();
-            path.extend(components.into_iter());
-        }
-
-        request_url
+        UrlParser::new()
+            .base_url(request_url)
+            .parse(path)
+            .unwrap()
     }
 }
