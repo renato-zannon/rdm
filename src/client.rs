@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, see <http://www.gnu.org/licenses/>. */
 
-use std::fmt;
+use std::{fmt, old_io};
 use std::error::FromError;
 use url::{Url, UrlParser};
 
@@ -47,15 +47,20 @@ enum Method {
     Delete,
 }
 
+trait PrintableError: ::std::error::Error + fmt::Debug {}
+impl<T> PrintableError for T where T: ::std::error::Error + fmt::Debug {}
+
 #[derive(Debug)]
 pub enum Error {
-    Http(hyper::HttpError)
+    Http(Box<PrintableError>),
+    Response(Box<PrintableError>),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match *self {
-            Error::Http(ref err) => write!(f, "Http error: {}", err),
+            Error::Http(ref err)     => write!(f, "Http error: {}", err),
+            Error::Response(ref err) => write!(f, "Invalid response: {}", err),
         }
     }
 }
@@ -64,13 +69,26 @@ impl ::std::error::Error for Error {
     fn description(&self) -> &str {
         match *self {
             Error::Http(_) => "Http error",
+            Error::Response(_) => "Received invalid response",
         }
     }
 }
 
 impl FromError<hyper::HttpError> for Error {
     fn from_error(err: hyper::HttpError) -> Error {
-        Error::Http(err)
+        Error::Http(Box::new(err))
+    }
+}
+
+impl FromError<old_io::IoError> for Error {
+    fn from_error(err: old_io::IoError) -> Error {
+        Error::Http(Box::new(err))
+    }
+}
+
+impl FromError<json::DecoderError> for Error {
+    fn from_error(err: json::DecoderError) -> Error {
+        Error::Response(Box::new(err))
     }
 }
 
@@ -101,14 +119,14 @@ impl Client {
             name: String,
         }
 
-        let maybe_response = self.send_request(Request {
+        let mut response = try!(self.send_request(Request {
             method: Method::Get,
             body: None,
             url: self.build_url("issue_statuses.json"),
-        });
+        }));
 
-        let response = maybe_response.unwrap().read_to_string().unwrap();
-        let parsed: IssueStatuses = json::decode(&response).unwrap();
+        let response_contents = try!(response.read_to_string());
+        let parsed: IssueStatuses = try!(json::decode(&response_contents));
 
         Ok(parsed.issue_statuses.into_iter().map(|status| (status.id, status.name)).collect())
     }
