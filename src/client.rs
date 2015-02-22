@@ -34,7 +34,7 @@ pub struct Client {
     config: Config,
 }
 
-struct Request<'a> {
+struct Request {
     method: Method,
     body: Option<String>,
     url: Url,
