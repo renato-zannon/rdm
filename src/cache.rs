@@ -38,7 +38,9 @@ impl Cache {
 
                 if newer_than_config {
                     let now    = time::now().to_timespec();
-                    let change = time::Timespec::new(cache_meta.modified() as i64, 0);
+
+                    let cache_modified_sec = cache_meta.modified() / 1_000;
+                    let change = time::Timespec::new(cache_modified_sec as i64, 0);
 
                     (now - change) < std_time::Duration::hours(2)
                 } else {
