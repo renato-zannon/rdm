@@ -8,7 +8,6 @@ authors = ["Renato Zannon <renato@rrsz.com.br>"]
 [dependencies]
 hyper = "*"
 docopt = "*"
-docopt_macros = "*"
 json_macros = "*"
 rustc-serialize = "*"
 url = "*"

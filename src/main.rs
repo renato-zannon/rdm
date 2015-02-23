@@ -15,7 +15,7 @@
  * along with this program; if not, see <http://www.gnu.org/licenses/>. */
 
 #![feature(plugin, core, io, path, env, unicode, fs, old_io, collections, std_misc)]
-#![plugin(json_macros, docopt_macros)]
+#![plugin(json_macros)]
 
 extern crate "rustc-serialize" as rustc_serialize;
 extern crate docopt;
