@@ -17,7 +17,7 @@
 use std::io::prelude::*;
 use std::fs::OpenOptions;
 use std::io::BufReader;
-use client::Client;
+use client::{self, Client};
 use rustc_serialize::{self, json};
 
 use std::time as std_time;
@@ -28,7 +28,7 @@ pub struct Cache {
 }
 
 impl Cache {
-    pub fn new(client: &mut Client) -> Cache {
+    pub fn new(client: &mut Client) -> Result<Cache, client::Error> {
         let config_path = client.config().path().to_path_buf();
         let cache_path  = config_path.with_file_name(&".rdm-cache.json");
 
@@ -53,6 +53,8 @@ impl Cache {
         let mut open_options = OpenOptions::new();
         open_options.read(true).write(true);
 
+        let cache;
+
         if cache_fresh {
             let file = open_options.open(&cache_path).unwrap();
 
@@ -60,16 +62,18 @@ impl Cache {
             BufReader::new(file).read_to_string(&mut cache_content).unwrap();
             let cache_data = json::decode(&cache_content).unwrap();
 
-            Cache { data: cache_data }
+            cache = Cache { data: cache_data };
         } else {
-            let cache_data = get_cache_data(client);
+            let cache_data = try!(get_cache_data(client));
             let cache_content = json::encode(&cache_data).unwrap();
 
             let mut file = open_options.create(true).truncate(true).open(&cache_path).unwrap();
             write!(&mut file, "{}", cache_content).unwrap();
 
-            Cache { data: cache_data }
+            cache = Cache { data: cache_data };
         }
+
+        Ok(cache)
     }
 
     pub fn issue_statuses(&self) -> Vec<(u32, String)> {
@@ -77,13 +81,13 @@ impl Cache {
     }
 }
 
-fn get_cache_data(client: &mut Client) -> CacheData {
-    let status_pairs = client.issue_statuses().unwrap();
+fn get_cache_data(client: &mut Client) -> Result<CacheData, client::Error> {
+    let status_pairs = try!(client.issue_statuses());
     let statuses = status_pairs.into_iter().map(IssueStatus::from_pair).collect();
 
-    CacheData {
+    Ok(CacheData {
         issue_statuses: statuses
-    }
+    })
 }
 
 #[derive(RustcDecodable, RustcEncodable, Clone)]

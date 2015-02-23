@@ -25,7 +25,7 @@ extern crate time;
 #[macro_use(impl_header, deref)]
 extern crate hyper;
 
-use std::env;
+use std::{fmt, env};
 
 mod args;
 mod client;
@@ -45,43 +45,50 @@ macro_rules! get_or_exit(
                 return;
             }
         }
-    }
+    };
+
+    ($result:expr) => { get_or_exit!($result, _ => 1) }
 );
 
 fn main() {
     let args   = get_or_exit!(args::parse(),      e => e.exit_status());
-    let config = get_or_exit!(user_config::get(), _ => 1);
+    let config = get_or_exit!(user_config::get());
 
     let mut client = client::Client::new(config.clone());
-    let cache = cache::Cache::new(&mut client);
+    let cache = get_or_exit!(cache::Cache::new(&mut client));
 
     match args {
         Args::CloseIssue { number, close_status } => {
-            let status_id = close_status
+            let status_name = close_status
                 .or_else(move || config.default_close_status().map(|s| s.to_string()))
-                .and_then(|name| find_status_id(&cache, &name))
-                .expect("Unable to find the status id to close the issue");
+                .expect("Unable to determine which status name to use");
 
-            get_or_exit!(client.update_issue(number, status_id), _ => 1);
+            let status_id = get_or_exit!(find_status_id(&cache, &status_name));
+
+            get_or_exit!(client.update_issue(number, status_id));
         },
 
         Args::UpdateIssue { number, new_status } => {
-            let status_id = match find_status_id(&cache, &new_status) {
-                Some(id) => id,
-                None     => panic!("Unable to find status id for status '{}'", new_status),
-            };
-
-            get_or_exit!(client.update_issue(number, status_id), _ => 1);
+            let status_id = get_or_exit!(find_status_id(&cache, &new_status));
+            get_or_exit!(client.update_issue(number, status_id));
         },
 
         _ => unimplemented!(),
     }
 }
 
-fn find_status_id(cache: &cache::Cache, status_name: &str) -> Option<u32> {
+struct NoMatchingStatus<'a>(&'a str);
+
+impl<'a> fmt::Display for NoMatchingStatus<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "No issue status matched '{}'", self.0)
+    }
+}
+
+fn find_status_id<'a>(cache: &cache::Cache, status_name: &'a str) -> Result<u32, NoMatchingStatus<'a>> {
     let statuses = cache.issue_statuses();
 
-    statuses.into_iter().filter_map(|(id, name)| {
+    let status = statuses.into_iter().filter_map(|(id, name)| {
         let matches = status_name.chars().zip(name.chars()).all(|(query_chr, name_chr)| {
             query_chr.to_lowercase() == name_chr.to_lowercase()
         });
@@ -91,5 +98,10 @@ fn find_status_id(cache: &cache::Cache, status_name: &str) -> Option<u32> {
         } else {
             None
         }
-    }).next()
+    }).next();
+
+    match status {
+        Some(status) => Ok(status),
+        None => Err(NoMatchingStatus(status_name)),
+    }
 }
