@@ -62,7 +62,7 @@ fn main() {
                 .and_then(|name| find_status_id(&cache, &name))
                 .expect("Unable to find the status id to close the issue");
 
-            client.update_issue(number, status_id).unwrap();
+            get_or_exit!(client.update_issue(number, status_id), _ => 1);
         },
 
         Args::UpdateIssue { number, new_status } => {
@@ -71,7 +71,7 @@ fn main() {
                 None     => panic!("Unable to find status id for status '{}'", new_status),
             };
 
-            client.update_issue(number, status_id).unwrap();
+            get_or_exit!(client.update_issue(number, status_id), _ => 1);
         },
 
         _ => unimplemented!(),

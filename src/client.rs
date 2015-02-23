@@ -20,7 +20,7 @@ use url::{Url, UrlParser};
 
 use hyper;
 use hyper::header::{self, HeaderFormat};
-use hyper::HttpResult;
+use hyper::status::StatusCode;
 
 use rustc_serialize::json;
 
@@ -40,11 +40,27 @@ struct Request {
     url: Url,
 }
 
+#[derive(Copy, Debug)]
 enum Method {
     Get,
     Post,
     Put,
     Delete,
+}
+
+impl fmt::Display for Method {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::Method::*;
+
+        let desc = match *self {
+            Get    => "GET",
+            Post   => "POST",
+            Put    => "PUT",
+            Delete => "DELETE",
+        };
+
+        write!(f, "{}", desc)
+    }
 }
 
 trait PrintableError: ::std::error::Error + fmt::Debug {}
@@ -54,13 +70,18 @@ impl<T> PrintableError for T where T: ::std::error::Error + fmt::Debug {}
 pub enum Error {
     Http(Box<PrintableError>),
     Response(Box<PrintableError>),
+    Forbidden(Method, Url),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match *self {
-            Error::Http(ref err)     => write!(f, "Http error: {}", err),
+            Error::Http(ref err) => write!(f, "Http error: {}", err),
             Error::Response(ref err) => write!(f, "Invalid response: {}", err),
+
+            Error::Forbidden(method, ref url) => {
+                write!(f, "Authorization error: Server denied access to {} {}", method, url)
+            }
         }
     }
 }
@@ -70,6 +91,7 @@ impl ::std::error::Error for Error {
         match *self {
             Error::Http(_) => "Http error",
             Error::Response(_) => "Received invalid response",
+            Error::Forbidden(_, _) => "User not authorized to perform action",
         }
     }
 }
@@ -133,14 +155,15 @@ impl Client {
         Ok(parsed.issue_statuses.into_iter().map(|status| (status.id, status.name)).collect())
     }
 
-    fn send_request<'a>(&self, request: Request) -> HttpResult<hyper::client::Response> {
+    fn send_request<'a>(&self, request: Request) -> Result<hyper::client::Response, Error> {
         let mut client = hyper::Client::new();
 
+        let url = request.url.clone();
         let request_builder = match request.method {
-            Method::Get    => client.get(request.url),
-            Method::Post   => client.post(request.url),
-            Method::Put    => client.put(request.url),
-            Method::Delete => client.delete(request.url),
+            Method::Get    => client.get(url),
+            Method::Post   => client.post(url),
+            Method::Put    => client.put(url),
+            Method::Delete => client.delete(url),
         };
 
         let request_with_headers = request_builder
@@ -152,7 +175,13 @@ impl Client {
             Some(ref s) => request_with_headers.body(&s[..]),
         };
 
-        complete_request.send()
+        let response = try!(complete_request.send());
+
+        if response.status == StatusCode::Forbidden {
+            Err(Error::Forbidden(request.method, request.url))
+        } else {
+            Ok(response)
+        }
     }
 
     fn issue_url(&self, number: u32) -> Url {
