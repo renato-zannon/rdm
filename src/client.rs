@@ -20,7 +20,7 @@ use url::{Url, UrlParser};
 
 use hyper;
 use hyper::header::{self, HeaderFormat};
-use hyper::status::StatusCode;
+use hyper::status::{StatusCode, StatusClass};
 
 use rustc_serialize::json;
 
@@ -71,6 +71,7 @@ pub enum Error {
     Http(Box<PrintableError>),
     Response(Box<PrintableError>),
     Forbidden(Method, Url),
+    Server(Method, Url),
 }
 
 impl fmt::Display for Error {
@@ -81,6 +82,10 @@ impl fmt::Display for Error {
 
             Error::Forbidden(method, ref url) => {
                 write!(f, "Authorization error: Server denied access to {} {}", method, url)
+            },
+
+            Error::Server(method, ref url) => {
+                write!(f, "Server-side error: Server returned error on {} {}", method, url)
             }
         }
     }
@@ -92,6 +97,7 @@ impl ::std::error::Error for Error {
             Error::Http(_) => "Http error",
             Error::Response(_) => "Received invalid response",
             Error::Forbidden(_, _) => "User not authorized to perform action",
+            Error::Server(_, _) => "Server-side error",
         }
     }
 }
@@ -182,9 +188,13 @@ impl Client {
         let response = try!(complete_request.send());
         debug!("Received response: {}", response.status);
 
-        match response.status {
-            StatusCode::Forbidden | StatusCode::Unauthorized => {
+        match (response.status, response.status.class()) {
+            (StatusCode::Forbidden, _) | (StatusCode::Unauthorized, _) => {
                 Err(Error::Forbidden(request.method, request.url))
+            },
+
+            (_, StatusClass::ServerError) => {
+                Err(Error::Server(request.method, request.url))
             },
 
             _ => Ok(response),
