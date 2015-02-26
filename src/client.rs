@@ -72,6 +72,7 @@ pub enum Error {
     Response(Box<PrintableError>),
     Forbidden(Method, Url),
     Server(Method, Url),
+    Unknown(Method, Url, StatusCode),
 }
 
 impl fmt::Display for Error {
@@ -86,6 +87,10 @@ impl fmt::Display for Error {
 
             Error::Server(method, ref url) => {
                 write!(f, "Server-side error: Server returned error on {} {}", method, url)
+            },
+
+            Error::Unknown(method, ref url, ref status) => {
+                write!(f, "Unkwnown error: Server returned {} on {} {}", status, method, url)
             }
         }
     }
@@ -94,10 +99,11 @@ impl fmt::Display for Error {
 impl ::std::error::Error for Error {
     fn description(&self) -> &str {
         match *self {
-            Error::Http(_) => "Http error",
-            Error::Response(_) => "Received invalid response",
-            Error::Forbidden(_, _) => "User not authorized to perform action",
-            Error::Server(_, _) => "Server-side error",
+            Error::Http(_)          => "Http error",
+            Error::Response(_)      => "Received invalid response",
+            Error::Forbidden(_, _)  => "User not authorized to perform action",
+            Error::Server(_, _)     => "Server-side error",
+            Error::Unknown(_, _, _) => "Unknown error",
         }
     }
 }
@@ -197,7 +203,13 @@ impl Client {
                 Err(Error::Server(request.method, request.url))
             },
 
-            _ => Ok(response),
+            (_, StatusClass::ClientError) | (_, StatusClass::NoClass)  => {
+                Err(Error::Unknown(request.method, request.url, response.status))
+            },
+
+            (_, StatusClass::Success) => Ok(response),
+
+            (status, _) => panic!("Response for status {} not implemented", status),
         }
     }
 
