@@ -21,6 +21,7 @@ extern crate "rustc-serialize" as rustc_serialize;
 extern crate docopt;
 extern crate url;
 extern crate time;
+extern crate uuid;
 
 #[macro_use]
 extern crate log;

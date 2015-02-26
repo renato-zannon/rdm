@@ -17,6 +17,7 @@
 use std::{fmt, old_io};
 use std::error::FromError;
 use url::{Url, UrlParser};
+use uuid::Uuid;
 
 use hyper;
 use hyper::header::{self, HeaderFormat};
@@ -168,10 +169,11 @@ impl Client {
     }
 
     fn send_request<'a>(&self, request: Request) -> Result<hyper::client::Response, Error> {
+        let request_id = Uuid::new_v4();
         let mut client = hyper::Client::new();
 
-        debug!("Making request {} {}", request.method, request.url);
-        debug!("Body: {:?}", request.body);
+        debug!("Request {} - {} {}", request_id, request.method, request.url);
+        debug!("Request {} - Body: {:?}", request_id, request.body);
 
         let url = request.url.clone();
 
@@ -192,7 +194,7 @@ impl Client {
         };
 
         let response = try!(complete_request.send());
-        debug!("Received response: {}", response.status);
+        debug!("Request {} - Received response: {}", request_id, response.status);
 
         match (response.status, response.status.class()) {
             (StatusCode::Forbidden, _) | (StatusCode::Unauthorized, _) => {
@@ -209,7 +211,9 @@ impl Client {
 
             (_, StatusClass::Success) => Ok(response),
 
-            (status, _) => panic!("Response for status {} not implemented", status),
+            (status, _) => {
+                panic!("Request {} - Response for status {} not implemented", request_id, status);
+            }
         }
     }
 
