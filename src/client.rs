@@ -26,6 +26,7 @@ use hyper::status::{StatusCode, StatusClass};
 use rustc_serialize::json;
 
 use user_config::Config;
+use models::{User, IssueStatus};
 
 #[derive(Clone)]
 struct RedmineApiKey(String);
@@ -64,8 +65,8 @@ impl fmt::Display for Method {
     }
 }
 
-trait PrintableError: ::std::error::Error + fmt::Debug {}
-impl<T> PrintableError for T where T: ::std::error::Error + fmt::Debug {}
+trait PrintableError: ::std::error::Error + fmt::Debug + Send {}
+impl<T> PrintableError for T where T: ::std::error::Error + fmt::Debug + Send {}
 
 #[derive(Debug)]
 pub enum Error {
@@ -144,16 +145,10 @@ impl Client {
         Ok(())
     }
 
-    pub fn issue_statuses(&self) -> Result<Vec<(u32, String)>, Error> {
+    pub fn issue_statuses(&self) -> Result<Vec<IssueStatus>, Error> {
         #[derive(RustcDecodable, Debug)]
         struct IssueStatuses {
             issue_statuses: Vec<IssueStatus>
-        }
-
-        #[derive(RustcDecodable, Debug)]
-        struct IssueStatus {
-            id: u32,
-            name: String,
         }
 
         let mut response = try!(self.send_request(Request {
@@ -165,7 +160,25 @@ impl Client {
         let response_contents = try!(response.read_to_string());
         let parsed: IssueStatuses = try!(json::decode(&response_contents));
 
-        Ok(parsed.issue_statuses.into_iter().map(|status| (status.id, status.name)).collect())
+        Ok(parsed.issue_statuses)
+    }
+
+    pub fn users(&self) -> Result<Vec<User>, Error> {
+        #[derive(RustcDecodable, Debug)]
+        struct Users {
+            users: Vec<User>
+        }
+
+        let mut response = try!(self.send_request(Request {
+            method: Method::Get,
+            body: None,
+            url: self.build_url("users.json"),
+        }));
+
+        let response_contents = try!(response.read_to_string());
+        let parsed: Users = try!(json::decode(&response_contents));
+
+        Ok(parsed.users)
     }
 
     fn send_request<'a>(&self, request: Request) -> Result<hyper::client::Response, Error> {

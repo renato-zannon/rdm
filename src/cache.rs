@@ -17,7 +17,10 @@
 use std::io::prelude::*;
 use std::fs::OpenOptions;
 use std::io::BufReader;
+use std::thread;
+
 use client::{self, Client};
+use models::{IssueStatus, User};
 use rustc_serialize::{self, json};
 
 use std::time as std_time;
@@ -82,29 +85,22 @@ impl Cache {
 }
 
 fn get_cache_data(client: &mut Client) -> Result<CacheData, client::Error> {
-    let status_pairs = try!(client.issue_statuses());
-    let statuses = status_pairs.into_iter().map(IssueStatus::from_pair).collect();
+    let statuses_guard = thread::scoped(|| {
+        client.issue_statuses()
+    });
+
+    let users_guard = thread::scoped(|| {
+        client.users()
+    });
 
     Ok(CacheData {
-        issue_statuses: statuses
+        issue_statuses: try!(statuses_guard.join()),
+        users:          try!(users_guard.join()),
     })
 }
 
 #[derive(RustcDecodable, RustcEncodable, Clone)]
 struct CacheData {
-    issue_statuses: Vec<IssueStatus>
-}
-
-#[derive(RustcDecodable, RustcEncodable, Clone)]
-struct IssueStatus {
-    id: u32,
-    name: String,
-}
-
-impl IssueStatus {
-    fn from_pair((id, name): (u32, String)) -> IssueStatus {
-        IssueStatus { id: id, name: name }
-    }
-
-    fn into_pair(self) -> (u32, String) { (self.id, self.name) }
+    issue_statuses: Vec<IssueStatus>,
+    users: Vec<User>
 }

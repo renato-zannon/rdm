@@ -32,6 +32,7 @@ extern crate hyper;
 
 use std::{fmt, env};
 
+mod models;
 mod args;
 mod client;
 mod user_config;
