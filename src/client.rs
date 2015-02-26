@@ -158,7 +158,11 @@ impl Client {
     fn send_request<'a>(&self, request: Request) -> Result<hyper::client::Response, Error> {
         let mut client = hyper::Client::new();
 
+        debug!("Making request {} {}", request.method, request.url);
+        debug!("Body: {:?}", request.body);
+
         let url = request.url.clone();
+
         let request_builder = match request.method {
             Method::Get    => client.get(url),
             Method::Post   => client.post(url),
@@ -176,11 +180,14 @@ impl Client {
         };
 
         let response = try!(complete_request.send());
+        debug!("Received response: {}", response.status);
 
-        if response.status == StatusCode::Forbidden {
-            Err(Error::Forbidden(request.method, request.url))
-        } else {
-            Ok(response)
+        match response.status {
+            StatusCode::Forbidden | StatusCode::Unauthorized => {
+                Err(Error::Forbidden(request.method, request.url))
+            },
+
+            _ => Ok(response),
         }
     }
 
