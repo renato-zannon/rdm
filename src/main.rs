@@ -22,6 +22,10 @@ extern crate docopt;
 extern crate url;
 extern crate time;
 
+#[macro_use]
+extern crate log;
+extern crate env_logger;
+
 #[macro_use(impl_header, deref)]
 extern crate hyper;
 
@@ -51,6 +55,8 @@ macro_rules! get_or_exit(
 );
 
 fn main() {
+    env_logger::init().unwrap();
+
     let args   = get_or_exit!(args::parse(),      e => e.exit_status());
     let config = get_or_exit!(user_config::get());
 
