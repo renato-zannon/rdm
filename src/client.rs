@@ -14,7 +14,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, see <http://www.gnu.org/licenses/>. */
 
-use std::{fmt, old_io};
+use std::fmt;
+use std::io::{self, Read};
 use std::error::FromError;
 use url::{Url, UrlParser};
 use uuid::Uuid;
@@ -116,8 +117,8 @@ impl FromError<hyper::HttpError> for Error {
     }
 }
 
-impl FromError<old_io::IoError> for Error {
-    fn from_error(err: old_io::IoError) -> Error {
+impl FromError<io::Error> for Error {
+    fn from_error(err: io::Error) -> Error {
         Error::Http(Box::new(err))
     }
 }
@@ -157,7 +158,9 @@ impl Client {
             url: self.build_url("issue_statuses.json"),
         }));
 
-        let response_contents = try!(response.read_to_string());
+        let mut response_contents = String::new();
+        try!(response.read_to_string(&mut response_contents));
+
         let parsed: IssueStatuses = try!(json::decode(&response_contents));
 
         Ok(parsed.issue_statuses)
@@ -175,7 +178,9 @@ impl Client {
             url: self.build_url("users.json"),
         }));
 
-        let response_contents = try!(response.read_to_string());
+        let mut response_contents = String::new();
+        try!(response.read_to_string(&mut response_contents));
+
         let parsed: Users = try!(json::decode(&response_contents));
 
         Ok(parsed.users)

@@ -21,7 +21,7 @@ use std::thread;
 
 use client::{self, Client};
 use models::{IssueStatus, User};
-use rustc_serialize::{self, json};
+use rustc_serialize::json;
 
 use std::time as std_time;
 use time;

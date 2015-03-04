@@ -6,7 +6,6 @@ version = "0.0.1"
 authors = ["Renato Zannon <renato@rrsz.com.br>"]
 
 [dependencies]
-hyper = "*"
 docopt = "*"
 json_macros = "*"
 rustc-serialize = "*"
@@ -15,3 +14,6 @@ time = "*"
 log = "*"
 env_logger = "*"
 uuid = "*"
+
+[dependencies.hyper]
+git = "https://github.com/hyperium/hyper"
