@@ -29,7 +29,7 @@ use rustc_serialize::json;
 use user_config::Config;
 use models::{User, IssueStatus};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct RedmineApiKey(String);
 impl_header!(RedmineApiKey, "X-Redmine-API-Key", String);
 
