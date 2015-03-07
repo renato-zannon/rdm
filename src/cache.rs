@@ -17,6 +17,7 @@
 use std::io::prelude::*;
 use std::fs::OpenOptions;
 use std::io::BufReader;
+use std::path::PathBuf;
 use std::thread;
 
 use client::{self, Client};
@@ -28,6 +29,7 @@ use time;
 
 pub struct Cache {
     data: CacheData,
+    path: PathBuf,
 }
 
 impl Cache {
@@ -56,51 +58,56 @@ impl Cache {
         let mut open_options = OpenOptions::new();
         open_options.read(true).write(true);
 
-        let cache;
+        let cache_data;
 
         if cache_fresh {
             let file = open_options.open(&cache_path).unwrap();
 
             let mut cache_content = String::new();
             BufReader::new(file).read_to_string(&mut cache_content).unwrap();
-            let cache_data = json::decode(&cache_content).unwrap();
-
-            cache = Cache { data: cache_data };
+            cache_data = json::decode(&cache_content).unwrap();
         } else {
-            let cache_data = try!(get_cache_data(client));
-            let cache_content = json::encode(&cache_data).unwrap();
-
-            let mut file = open_options.create(true).truncate(true).open(&cache_path).unwrap();
-            write!(&mut file, "{}", cache_content).unwrap();
-
-            cache = Cache { data: cache_data };
+            cache_data = CacheData {
+                issue_statuses: None,
+                users: None,
+            };
         }
 
-        Ok(cache)
+        Ok(Cache {
+            data: cache_data,
+            path: cache_path,
+        })
     }
 
-    pub fn issue_statuses(&self) -> Vec<(u32, String)> {
-        self.data.issue_statuses.clone().map_in_place(|s| s.into_pair())
+    pub fn issue_statuses(&mut self, client: &Client) -> Result<Vec<(u32, String)>, client::Error> {
+        let statuses = match self.data.issue_statuses {
+            Some(ref statuses) => statuses.clone(),
+
+            None => {
+                let statuses = try!(client.issue_statuses());
+                self.data.issue_statuses = Some(statuses.clone());
+                self.update_cache();
+                statuses
+            }
+        };
+
+        Ok(statuses.map_in_place(|s| s.into_pair()))
     }
-}
 
-fn get_cache_data(client: &mut Client) -> Result<CacheData, client::Error> {
-    let statuses_guard = thread::scoped(|| {
-        client.issue_statuses()
-    });
+    fn update_cache(&self) {
+        let mut open_options = OpenOptions::new();
+        open_options.write(true).create(true).truncate(true);
 
-    let users_guard = thread::scoped(|| {
-        client.users()
-    });
+        let cache_content = json::encode(&self.data).unwrap();
 
-    Ok(CacheData {
-        issue_statuses: try!(statuses_guard.join()),
-        users:          try!(users_guard.join()),
-    })
+        let mut file = open_options.open(&self.path).unwrap();
+        write!(&mut file, "{}", cache_content).unwrap();
+    }
+
 }
 
 #[derive(RustcDecodable, RustcEncodable, Clone)]
 struct CacheData {
-    issue_statuses: Vec<IssueStatus>,
-    users: Vec<User>
+    issue_statuses: Option<Vec<IssueStatus>>,
+    users: Option<Vec<User>>
 }

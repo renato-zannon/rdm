@@ -63,7 +63,7 @@ fn main() {
     let config = get_or_exit!(user_config::get());
 
     let mut client = client::Client::new(config.clone());
-    let cache = get_or_exit!(cache::Cache::new(&mut client));
+    let mut cache = get_or_exit!(cache::Cache::new(&mut client));
 
     match args {
         Args::CloseIssue { number, close_status } => {
@@ -71,13 +71,13 @@ fn main() {
                 .or_else(move || config.default_close_status().map(|s| s.to_string()))
                 .expect("Unable to determine which status name to use");
 
-            let status_id = get_or_exit!(find_status_id(&cache, &status_name));
+            let status_id = get_or_exit!(find_status_id(&mut cache, &client, &status_name));
 
             get_or_exit!(client.update_issue(number, status_id));
         },
 
         Args::UpdateIssue { number, new_status } => {
-            let status_id = get_or_exit!(find_status_id(&cache, &new_status));
+            let status_id = get_or_exit!(find_status_id(&mut cache, &client, &new_status));
             get_or_exit!(client.update_issue(number, status_id));
         },
 
@@ -93,8 +93,8 @@ impl<'a> fmt::Display for NoMatchingStatus<'a> {
     }
 }
 
-fn find_status_id<'a>(cache: &cache::Cache, status_name: &'a str) -> Result<u32, NoMatchingStatus<'a>> {
-    let statuses = cache.issue_statuses();
+fn find_status_id<'a>(cache: &mut cache::Cache, client: &client::Client, status_name: &'a str) -> Result<u32, NoMatchingStatus<'a>> {
+    let statuses = cache.issue_statuses(client).unwrap();
 
     let status = statuses.into_iter().filter_map(|(id, name)| {
         let matches = status_name.chars().zip(name.chars()).all(|(query_chr, name_chr)| {
