@@ -15,3 +15,6 @@ log = "*"
 env_logger = "*"
 uuid = "*"
 hyper = "*"
+
+[profile.dev]
+debug = false
