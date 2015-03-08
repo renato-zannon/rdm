@@ -18,7 +18,6 @@ use std::io::prelude::*;
 use std::fs::OpenOptions;
 use std::io::BufReader;
 use std::path::PathBuf;
-use std::thread;
 
 use client::{self, Client};
 use models::{IssueStatus, User};
