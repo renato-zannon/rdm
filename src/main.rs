@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, see <http://www.gnu.org/licenses/>. */
 
-#![feature(plugin, core, io, path, unicode, path_ext, fs_time, collections, std_misc, exit_status)]
+#![feature(plugin, core, path_ext, fs_time, collections, std_misc, exit_status)]
 #![plugin(json_macros)]
 
 extern crate "rustc-serialize" as rustc_serialize;
@@ -98,7 +98,7 @@ fn find_status_id<'a>(cache: &mut cache::Cache, client: &client::Client, status_
 
     let status = statuses.into_iter().filter_map(|(id, name)| {
         let matches = status_name.chars().zip(name.chars()).all(|(query_chr, name_chr)| {
-            query_chr.to_lowercase() == name_chr.to_lowercase()
+            query_chr.to_lowercase().zip(name_chr.to_lowercase()).all(|(a, b)| a == b)
         });
 
         if matches {
