@@ -21,9 +21,8 @@ use std::path::PathBuf;
 
 use client::{self, Client};
 use models::{IssueStatus, User};
-use rustc_serialize::json;
 
-use std::time as std_time;
+use rustc_serialize::json;
 use time;
 
 pub struct Cache {
@@ -46,7 +45,7 @@ impl Cache {
                     let cache_modified_sec = cache_meta.modified() / 1_000;
                     let change = time::Timespec::new(cache_modified_sec as i64, 0);
 
-                    (now - change) < std_time::Duration::hours(2)
+                    (now - change) < time::Duration::hours(2)
                 } else {
                     false
                 }

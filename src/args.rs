@@ -121,14 +121,14 @@ impl error::Error for Error {
     }
 }
 
-impl error::FromError<docopt::Error> for Error {
-    fn from_error(err: docopt::Error) -> Error {
+impl From<docopt::Error> for Error {
+    fn from(err: docopt::Error) -> Error {
         Error { cause: ErrorCause::FromDocopt(err) }
     }
 }
 
-impl error::FromError<&'static str> for Error {
-    fn from_error(message: &'static str) -> Error {
+impl From<&'static str> for Error {
+    fn from(message: &'static str) -> Error {
         Error { cause: ErrorCause::InconsistentArguments(message) }
     }
 }
@@ -154,7 +154,7 @@ pub fn parse() -> Result<Args, Error> {
     if raw.cmd_update {
         match raw.flag_status {
             Some(st) => Ok(Args::UpdateIssue { number: issue_number, new_status: st }),
-            None     => Err(error::FromError::from_error("update")),
+            None     => Err(From::from("update")),
         }
     } else if raw.cmd_close {
         Ok(Args::CloseIssue { number: issue_number, close_status: raw.flag_status })

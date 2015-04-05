@@ -16,12 +16,12 @@
 
 use std::fmt;
 use std::io::{self, Read};
-use std::error::FromError;
+use std::collections::HashMap;
 use url::{Url, UrlParser};
 use uuid::Uuid;
 
 use hyper;
-use hyper::header::{self, HeaderFormat};
+use hyper::header;
 use hyper::status::{StatusCode, StatusClass};
 
 use rustc_serialize::json;
@@ -29,9 +29,9 @@ use rustc_serialize::json;
 use user_config::Config;
 use models::{User, IssueStatus};
 
-#[derive(Clone, Debug)]
-struct RedmineApiKey(String);
-impl_header!(RedmineApiKey, "X-Redmine-API-Key", String);
+header! {
+    (RedmineApiKey, "X-Redmine-API-Key") => [String]
+}
 
 pub struct Client {
     config: Config,
@@ -43,7 +43,7 @@ struct Request {
     url: Url,
 }
 
-#[derive(Copy, Debug)]
+#[derive(Clone, Copy, Debug)]
 enum Method {
     Get,
     Post,
@@ -111,20 +111,20 @@ impl ::std::error::Error for Error {
     }
 }
 
-impl FromError<hyper::HttpError> for Error {
-    fn from_error(err: hyper::HttpError) -> Error {
+impl From<hyper::HttpError> for Error {
+    fn from(err: hyper::HttpError) -> Error {
         Error::Http(Box::new(err))
     }
 }
 
-impl FromError<io::Error> for Error {
-    fn from_error(err: io::Error) -> Error {
+impl From<io::Error> for Error {
+    fn from(err: io::Error) -> Error {
         Error::Http(Box::new(err))
     }
 }
 
-impl FromError<json::DecoderError> for Error {
-    fn from_error(err: json::DecoderError) -> Error {
+impl From<json::DecoderError> for Error {
+    fn from(err: json::DecoderError) -> Error {
         Error::Response(Box::new(err))
     }
 }
@@ -137,9 +137,19 @@ impl Client {
     }
 
     pub fn update_issue(&self, number: u32, status: u32) -> Result<(), Error> {
+        let body = {
+            let mut body       = HashMap::new();
+            let mut issue_diff = HashMap::new();
+
+            issue_diff.insert("status_id", status);
+            body.insert("issue", issue_diff);
+
+            json::encode(&body).unwrap()
+        };
+
         let _response = try!(self.send_request(Request {
             method: Method::Put,
-            body: Some(json!({ "issue": { "status_id": (status) } }).to_string()),
+            body: Some(body),
             url: self.issue_url(number),
         }));
 

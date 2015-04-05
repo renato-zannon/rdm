@@ -19,7 +19,7 @@ use std::io::{self, BufReader};
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
-use std::error::{Error, FromError};
+use std::error::Error;
 use std::{env, fmt};
 
 use rustc_serialize::json;
@@ -47,6 +47,7 @@ impl Config {
     }
 }
 
+#[derive(Debug)]
 pub enum ConfigError {
     Loading(io::Error),
     Parsing(json::DecoderError),
@@ -83,14 +84,14 @@ impl Error for ConfigError {
     }
 }
 
-impl FromError<io::Error> for ConfigError {
-    fn from_error(err: io::Error) -> ConfigError {
+impl From<io::Error> for ConfigError {
+    fn from(err: io::Error) -> ConfigError {
         ConfigError::Loading(err)
     }
 }
 
-impl FromError<json::DecoderError> for ConfigError {
-    fn from_error(err: json::DecoderError) -> ConfigError {
+impl From<json::DecoderError> for ConfigError {
+    fn from(err: json::DecoderError) -> ConfigError {
         ConfigError::Parsing(err)
     }
 }
@@ -120,7 +121,7 @@ fn first_user_config() -> Result<PathBuf, Vec<PathBuf>> {
     use std::iter::Unfold;
 
     let cwd: Option<PathBuf> = env::current_dir().ok().map(|old_path| {
-        PathBuf::new(&old_path)
+        PathBuf::from(&old_path)
     });
 
     let possible_paths = Unfold::new(cwd, |current_dir| {

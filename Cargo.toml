@@ -7,7 +7,7 @@ authors = ["Renato Zannon <renato@rrsz.com.br>"]
 
 [dependencies]
 docopt = "*"
-json_macros = "*"
+# json_macros = "*"
 rustc-serialize = "*"
 url = "*"
 time = "*"

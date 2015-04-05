@@ -14,10 +14,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, see <http://www.gnu.org/licenses/>. */
 
-#![feature(plugin, core, path_ext, fs_time, collections, std_misc, exit_status)]
-#![plugin(json_macros)]
+#![feature(core, path_ext, fs_time, collections, exit_status)]
 
-extern crate "rustc-serialize" as rustc_serialize;
+extern crate rustc_serialize;
 extern crate docopt;
 extern crate url;
 extern crate time;
@@ -27,7 +26,7 @@ extern crate uuid;
 extern crate log;
 extern crate env_logger;
 
-#[macro_use(impl_header, deref)]
+#[macro_use(header, deref)]
 extern crate hyper;
 
 use std::{fmt, env};
